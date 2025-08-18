@@ -52,6 +52,55 @@ print_info() { echo -e "${BLUE}${ICON_INFO} $1${NC}"; }
 print_header() { echo -e "${BOLD}${CYAN}$1${NC}"; }
 print_subheader() { echo -e "${BOLD}${WHITE}$1${NC}"; }
 
+# ==================== 核心函数 ====================
+
+# 通用的代理环境变量设置函数
+_claude_set_proxy_env() {
+    local proxy_id="$1"
+    local show_output="${2:-true}"
+    
+    # 获取代理信息
+    local proxy_name=$(jq -r ".proxies[\"$proxy_id\"].name" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
+    local proxy_url=$(jq -r ".proxies[\"$proxy_id\"].url" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
+    local api_key=$(jq -r ".proxies[\"$proxy_id\"].api_key" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
+    local auth_token=$(jq -r ".proxies[\"$proxy_id\"].auth_token" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
+    
+    # 重置认证环境变量
+    unset ANTHROPIC_API_KEY
+    unset ANTHROPIC_AUTH_TOKEN
+    
+    # 设置环境变量
+    export ANTHROPIC_BASE_URL="$proxy_url"
+    export CLAUDE_PROXY_ID="$proxy_id"
+    
+    if [ "$api_key" != "null" ] && [ -n "$api_key" ]; then
+        export ANTHROPIC_API_KEY="$api_key"
+    fi
+    
+    if [ "$auth_token" != "null" ] && [ -n "$auth_token" ]; then
+        export ANTHROPIC_AUTH_TOKEN="$auth_token"
+    fi
+    
+    # 保存当前代理ID
+    echo "$proxy_id" > "$CLAUDE_CURRENT_FILE"
+    
+    # 根据参数决定是否显示输出
+    if [ "$show_output" = "true" ]; then
+        print_success "已切换到代理: ${BOLD}$proxy_name${NC} ${GRAY}($proxy_url)${NC}"
+        print_subheader "${ICON_CONFIG} 环境变量已设置:"
+        echo -e "  ${CYAN}${ICON_URL} ANTHROPIC_BASE_URL${NC}=${YELLOW}$proxy_url${NC}"
+        echo -e "  ${CYAN}${ICON_PROXY} CLAUDE_PROXY_ID${NC}=${YELLOW}$proxy_id${NC}"
+        
+        if [ "$api_key" != "null" ] && [ -n "$api_key" ]; then
+            echo -e "  ${CYAN}${ICON_KEY} ANTHROPIC_API_KEY${NC}=${YELLOW}${api_key:0:10}...${NC}"
+        fi
+        
+        if [ "$auth_token" != "null" ] && [ -n "$auth_token" ]; then
+            echo -e "  ${CYAN}${ICON_TOKEN} ANTHROPIC_AUTH_TOKEN${NC}=${YELLOW}${auth_token:0:10}...${NC}"
+        fi
+    fi
+}
+
 # ==================== 主函数 ====================
 # 功能: Claude代理切换工具的主入口函数
 # 参数: $1 - 命令 (list|switch|add|remove|status|init|help)
@@ -131,52 +180,7 @@ EOF
         fi
     }
     
-    # 通用代理设置函数 - 复用代码，遵循DRY原则
-    local _set_proxy_env() {
-        local proxy_id="$1"
-        local show_output="${2:-true}"  # 默认显示输出
-        
-        # 获取代理信息
-        local proxy_name=$(jq -r ".proxies[\"$proxy_id\"].name" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
-        local proxy_url=$(jq -r ".proxies[\"$proxy_id\"].url" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
-        local api_key=$(jq -r ".proxies[\"$proxy_id\"].api_key" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
-        local auth_token=$(jq -r ".proxies[\"$proxy_id\"].auth_token" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
-        
-        # 重置认证环境变量
-        unset ANTHROPIC_API_KEY
-        unset ANTHROPIC_AUTH_TOKEN
-        
-        # 设置环境变量
-        export ANTHROPIC_BASE_URL="$proxy_url"
-        export CLAUDE_PROXY_ID="$proxy_id"
-        
-        if [ "$api_key" != "null" ] && [ -n "$api_key" ]; then
-            export ANTHROPIC_API_KEY="$api_key"
-        fi
-        
-        if [ "$auth_token" != "null" ] && [ -n "$auth_token" ]; then
-            export ANTHROPIC_AUTH_TOKEN="$auth_token"
-        fi
-        
-        # 保存当前代理
-        echo "$proxy_id" > "$CLAUDE_CURRENT_FILE"
-        
-        # 根据参数决定是否显示输出
-        if [ "$show_output" = "true" ]; then
-            print_success "已切换到代理: ${BOLD}$proxy_name${NC} ${GRAY}($proxy_url)${NC}"
-            print_subheader "${ICON_CONFIG} 环境变量已设置:"
-            echo -e "  ${CYAN}${ICON_URL} ANTHROPIC_BASE_URL${NC}=${YELLOW}$proxy_url${NC}"
-            echo -e "  ${CYAN}${ICON_PROXY} CLAUDE_PROXY_ID${NC}=${YELLOW}$proxy_id${NC}"
-            
-            if [ "$api_key" != "null" ] && [ -n "$api_key" ]; then
-                echo -e "  ${CYAN}${ICON_KEY} ANTHROPIC_API_KEY${NC}=${YELLOW}${api_key:0:10}...${NC}"
-            fi
-            
-            if [ "$auth_token" != "null" ] && [ -n "$auth_token" ]; then
-                echo -e "  ${CYAN}${ICON_TOKEN} ANTHROPIC_AUTH_TOKEN${NC}=${YELLOW}${auth_token:0:10}...${NC}"
-            fi
-        fi
-    }
+
     
     # 代理切换函数
     local _claude_switch() {
@@ -213,7 +217,7 @@ EOF
         fi
         
         # 调用通用设置函数
-        _set_proxy_env "$proxy_id" "true"
+        _claude_set_proxy_env "$proxy_id" "true"
     }
     
     # 添加代理函数
@@ -500,35 +504,7 @@ EOF
 # ==================== 自动恢复上次使用的代理 ====================
 # 如果存在上次使用的代理记录，自动恢复环境变量
 () {
-    # 使用局部函数避免污染全局环境，复用claude_proxy函数中的_set_proxy_env
-    local _set_proxy_env_global() {
-        local proxy_id="$1"
-        
-        # 获取代理信息
-        local proxy_name=$(jq -r ".proxies[\"$proxy_id\"].name" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
-        local proxy_url=$(jq -r ".proxies[\"$proxy_id\"].url" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
-        local api_key=$(jq -r ".proxies[\"$proxy_id\"].api_key" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
-        local auth_token=$(jq -r ".proxies[\"$proxy_id\"].auth_token" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
-        
-        # 重置认证环境变量
-        unset ANTHROPIC_API_KEY
-        unset ANTHROPIC_AUTH_TOKEN
-        
-        # 设置环境变量
-        export ANTHROPIC_BASE_URL="$proxy_url"
-        export CLAUDE_PROXY_ID="$proxy_id"
-        
-        if [ "$api_key" != "null" ] && [ -n "$api_key" ]; then
-            export ANTHROPIC_API_KEY="$api_key"
-        fi
-        
-        if [ "$auth_token" != "null" ] && [ -n "$auth_token" ]; then
-            export ANTHROPIC_AUTH_TOKEN="$auth_token"
-        fi
-        
-        # 显示恢复信息
-        print_success "已自动恢复上次使用的代理: ${BOLD}$proxy_name${NC} ${GRAY}($proxy_id)${NC}"
-    }
+
     
     # 检查文件和工具
     if [ -f "$CLAUDE_CURRENT_FILE" ] && [ -f "$CLAUDE_CONFIG_FILE" ] && command -v jq >/dev/null 2>&1; then
@@ -537,7 +513,10 @@ EOF
             # 检查代理是否仍然存在于配置文件中
             local proxy_exists=$(jq -r ".proxies | has(\"$current_proxy_id\")" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
             if [ "$proxy_exists" = "true" ]; then
-                _set_proxy_env_global "$current_proxy_id"
+                _claude_set_proxy_env "$current_proxy_id" "false"
+                # 显示恢复信息
+                local proxy_name=$(jq -r ".proxies[\"$current_proxy_id\"].name" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
+                print_success "已自动恢复上次使用的代理: ${BOLD}$proxy_name${NC} ${GRAY}($current_proxy_id)${NC}"
             else
                 # 如果代理不存在了，清除记录文件
                 rm -f "$CLAUDE_CURRENT_FILE"
