@@ -147,14 +147,21 @@ EOF
     
     # 列表显示函数
     local _claude_list() {
+        local use_fzf="$1"  # 是否使用fzf交互式选择
+        
         if [ ! -f "$CLAUDE_CONFIG_FILE" ]; then
             print_warning "配置文件不存在，正在初始化..."
             _init_claude_config
             return
         fi
         
-        print_header "${ICON_LIST} 可用的Claude代理站"
-        echo -e "${GRAY}===========================================${NC}"
+        # 检查jq工具
+        if ! command -v jq >/dev/null 2>&1; then
+            print_error "需要安装jq来解析配置文件"
+            print_info "macOS: ${BOLD}brew install jq${NC}"
+            print_info "Ubuntu: ${BOLD}sudo apt-get install jq${NC}"
+            return 1
+        fi
         
         # 获取当前使用的代理ID
         local current=""
@@ -162,21 +169,85 @@ EOF
             current=$(cat "$CLAUDE_CURRENT_FILE")
         fi
         
-        # 使用jq解析JSON并列出所有代理配置
-        if command -v jq >/dev/null 2>&1; then
-            jq -r '.proxies | to_entries[] | "\(.key): \(.value.name) (\(.value.url))"' "$CLAUDE_CONFIG_FILE" | while read line; do
+        # 如果使用fzf交互式选择
+        if [ "$use_fzf" = "true" ] && command -v fzf >/dev/null 2>&1; then
+            print_header "${ICON_LIST} 选择Claude代理站 (使用fzf)"
+            echo -e "${GRAY}===========================================${NC}"
+            
+            # 生成fzf选项列表
+            local fzf_options=$(jq -r '.proxies | to_entries[] | "\(.key): \(.value.name) (\(.value.url))"' "$CLAUDE_CONFIG_FILE" | while read line; do
                 proxy_id=$(echo "$line" | cut -d':' -f1)
                 proxy_info=$(echo "$line" | cut -d':' -f2-)
                 if [ "$proxy_id" = "$current" ]; then
-                    echo -e "${GREEN}${ICON_CURRENT} ${BOLD}$proxy_id${NC}${GREEN}:$proxy_info ${YELLOW}[当前使用]${NC}"
+                    echo "👉 $proxy_id:$proxy_info [当前使用]"
                 else
-                    echo -e "${BLUE}${ICON_PROXY} ${BOLD}$proxy_id${NC}${BLUE}:$proxy_info${NC}"
+                    echo "🌐 $proxy_id:$proxy_info"
                 fi
-            done
-        else
-            print_error "需要安装jq来解析配置文件"
-            print_info "macOS: ${BOLD}brew install jq${NC}"
-            print_info "Ubuntu: ${BOLD}sudo apt-get install jq${NC}"
+            done)
+            
+            # 创建临时预览脚本
+            local preview_script=$(mktemp)
+            cat > "$preview_script" << 'EOF'
+#!/bin/bash
+proxy_id=$(echo "$1" | sed 's/^[👉🌐] //g' | cut -d':' -f1)
+echo "=== 代理详细信息 ==="
+echo "代理ID: $proxy_id"
+jq -r ".proxies[\"$proxy_id\"] | \"代理名称: \(.name)\n代理网址: \(.url)\nAPI密钥: \(if .api_key and .api_key != \"\" then \"已设置\" else \"未设置\" end)\n认证令牌: \(if .auth_token and .auth_token != \"\" then \"已设置\" else \"未设置\" end)\"" "$CLAUDE_CONFIG_FILE" 2>/dev/null || echo "无法读取代理信息"
+EOF
+            chmod +x "$preview_script"
+            
+            # 使用fzf进行选择
+             local selected=$(echo "$fzf_options" | fzf \
+                 --height=40% \
+                 --border \
+                 --prompt="选择代理: " \
+                 --header="使用方向键选择，回车确认，ESC取消" \
+                 --preview-window=right:40% \
+                 --preview="'$preview_script' {}" \
+                 --color="fg:#ffffff,bg:#1e1e1e,hl:#00ff00,fg+:#ffffff,bg+:#3a3a3a,hl+:#00ff00,info:#ffff00,prompt:#00ffff,pointer:#ff00ff,marker:#ff0000,spinner:#ffff00,header:#00ffff")
+            
+            # 清理临时文件
+            rm -f "$preview_script"
+            
+            if [ -n "$selected" ]; then
+                # 提取代理ID
+                local selected_id=$(echo "$selected" | sed 's/^[👉🌐] //g' | cut -d':' -f1)
+                print_info "您选择了代理: ${BOLD}$selected_id${NC}"
+                
+                # 直接切换到选中的代理
+                _claude_set_proxy_env "$selected_id" "true"
+            else
+                print_info "未选择任何代理"
+            fi
+            
+        elif [ "$use_fzf" = "true" ]; then
+            # fzf未安装的提示
+            print_warning "fzf未安装，使用普通列表模式"
+            print_info "安装fzf以启用交互式选择: ${BOLD}brew install fzf${NC} (macOS) 或 ${BOLD}sudo apt install fzf${NC} (Ubuntu)"
+            echo ""
+        fi
+        
+        # 普通列表显示模式
+        if [ "$use_fzf" != "true" ]; then
+            print_header "${ICON_LIST} 可用的Claude代理站"
+            echo -e "${GRAY}===========================================${NC}"
+        fi
+        
+        # 使用jq解析JSON并列出所有代理配置
+        jq -r '.proxies | to_entries[] | "\(.key): \(.value.name) (\(.value.url))"' "$CLAUDE_CONFIG_FILE" | while read line; do
+            proxy_id=$(echo "$line" | cut -d':' -f1)
+            proxy_info=$(echo "$line" | cut -d':' -f2-)
+            if [ "$proxy_id" = "$current" ]; then
+                echo -e "${GREEN}${ICON_CURRENT} ${BOLD}$proxy_id${NC}${GREEN}:$proxy_info ${YELLOW}[当前使用]${NC}"
+            else
+                echo -e "${BLUE}${ICON_PROXY} ${BOLD}$proxy_id${NC}${BLUE}:$proxy_info${NC}"
+            fi
+        done
+        
+        # 如果是普通模式，提示可以使用fzf
+        if [ "$use_fzf" != "true" ] && command -v fzf >/dev/null 2>&1; then
+            echo ""
+            print_info "💡 提示: 使用 ${BOLD}claude_proxy select${NC} 启用交互式选择模式"
         fi
     }
     
@@ -402,6 +473,7 @@ EOF
             "$(print_subheader "${ICON_CONFIG} 用法: claude_proxy <命令> [参数...]")" \
             "" \
             "$(print_subheader "${ICON_LIST} 可用命令:")" \
+            "  ${GREEN}(无参数)${NC}              使用fzf交互式选择并切换代理 (默认行为)" \
             "  ${GREEN}list, ls${NC}              列出所有可用的代理配置" \
             "  ${GREEN}switch, use${NC} <id>      切换到指定的代理" \
             "  ${GREEN}add${NC} <id> <name> <url> [api_key] [auth_token]" \
@@ -418,6 +490,7 @@ EOF
             "  ${CYAN}${ICON_PROXY} CLAUDE_PROXY_ID${NC}       -> 当前使用的代理ID" \
             "" \
             "$(print_subheader "${ICON_INFO} 示例:")" \
+            "  ${BOLD}claude_proxy${NC}                         # 交互式选择代理 (默认行为, 需要fzf)" \
             "  ${BOLD}claude_proxy list${NC}                    # 列出所有代理" \
             "  ${BOLD}claude_proxy switch proxy1${NC}           # 切换到proxy1" \
             "  ${BOLD}claude_proxy add myproxy \"我的代理\" \"https://api.example.com\" \"sk-xxx\"${NC}" \
@@ -426,6 +499,7 @@ EOF
             "$(print_subheader "${ICON_WARNING} 注意:")" \
             "  ${GRAY}• 配置文件位置: ~/.claude_proxy/config.json${NC}" \
             "  ${GRAY}• 需要安装jq工具来解析JSON配置文件${NC}" \
+            "  ${GRAY}• 需要安装fzf工具来使用交互式选择功能${NC}" \
             "  ${GRAY}• api_key和auth_token至少需要提供一个${NC}" \
             "  ${GRAY}• 认证信息在显示时会被部分隐藏以保护安全${NC}" \
             "  ${GRAY}• 使用局部函数定义，保持代码可读性的同时确保私有化${NC}"
@@ -444,7 +518,7 @@ EOF
     # 根据命令执行相应操作
     case "$command" in
         "list"|"ls")
-            _claude_list
+            _claude_list "false"
             ;;
         "switch"|"use")
             _claude_switch "$@"
@@ -461,8 +535,12 @@ EOF
         "init")
             print_success "配置初始化完成"
             ;;
-        "help"|"--help"|"-h"|"")
+        "help"|"--help"|"-h")
             _claude_help
+            ;;
+        "")
+            # 默认启动交互式选择模式
+            _claude_list "true"
             ;;
         *)
             print_error "未知命令: $command"
@@ -528,5 +606,3 @@ EOF
 
 # ==================== 脚本加载完成 ====================
 print_success "Claude代理切换工具已加载完成 (v2.4)"
-print_info "添加了颜色格式和图标，提升用户体验"
-print_info "使用 '${BOLD}claude_proxy help${NC}' 查看帮助信息"
