@@ -1,0 +1,69 @@
+# Rust编译输出
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo相关
+Cargo.lock
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统相关
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 备份文件
+*.bak
+*.backup
+
+# 测试覆盖率报告
+tarpaulin-report.html
+
+# 性能分析文件
+*.prof
+
+# 文档生成
+/doc/
+
+# 本地配置文件（如果有敏感信息）
+config.local.*
+
+# 构建缓存
+.cache/
+
+# 锁文件（某些情况下可能需要忽略）
+# Cargo.lock  # 对于库项目通常忽略，对于应用项目通常保留
+
+# 平台特定的可执行文件
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 调试信息
+*.dSYM/
+
+# 本项目特定的忽略项
+# 如果有本地测试配置或临时脚本，可以在这里添加
