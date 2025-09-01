@@ -1,10 +1,15 @@
-# Claude Proxy Switcher 🌐
+# Claude代理切换工具 (Rust版本)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Shell Script](https://img.shields.io/badge/Shell-Zsh/Bash-green.svg)](https://www.gnu.org/software/bash/)
-[![Version](https://img.shields.io/badge/Version-2.4-blue.svg)](https://github.com/your-username/claude-proxy-switcher)
+🚀 **claude_px** - 一个用Rust重写的Claude代理站切换工具，提供更快的性能和更好的用户体验。
 
-一个优雅的 Claude AI 代理站切换工具，支持多代理配置管理和快速切换，提供美观的彩色输出界面。
+## ✨ 特性
+
+- 🦀 **Rust编写** - 更快的启动速度和更低的资源占用
+- 🎯 **交互式选择** - 使用skim提供流畅的交互体验
+- 🌈 **彩色输出** - 美观的命令行界面
+- 📦 **简单配置** - JSON格式的配置文件
+- 🔄 **自动恢复** - 启动时自动恢复上次使用的代理
+- 🛡️ **安全管理** - 敏感信息部分隐藏显示
 
 ## ✨ 特性
 
