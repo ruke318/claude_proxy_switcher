@@ -110,7 +110,7 @@ _claude_set_proxy_env() {
 # 说明: 统一的命令行接口，支持所有代理管理功能，使用局部函数保持代码可读性
 claude_proxy() {
     local command="$1"
-    shift
+    [ $# -gt 0 ] && shift
     
     # ==================== 局部函数定义 ====================
     
@@ -186,26 +186,103 @@ EOF
                 fi
             done)
             
-            # 创建临时预览脚本
+            # 创建临时预览脚本 - 美化JSON格式并安全处理敏感信息
             local preview_script=$(mktemp)
-            cat > "$preview_script" << 'EOF'
+            cat > "$preview_script" << EOF
 #!/bin/bash
-proxy_id=$(echo "$1" | sed 's/^[👉🌐] //g' | cut -d':' -f1)
-echo "=== 代理详细信息 ==="
-echo "代理ID: $proxy_id"
-jq -r ".proxies[\"$proxy_id\"] | \"代理名称: \(.name)\n代理网址: \(.url)\nAPI密钥: \(if .api_key and .api_key != \"\" then \"已设置\" else \"未设置\" end)\n认证令牌: \(if .auth_token and .auth_token != \"\" then \"已设置\" else \"未设置\" end)\"" "$CLAUDE_CONFIG_FILE" 2>/dev/null || echo "无法读取代理信息"
+proxy_id=\$(echo "\$1" | sed 's/^[👉🌐] //g' | cut -d':' -f1)
+
+# 安全处理函数 - 对敏感信息进行脱敏
+safe_mask() {
+    local value="\$1"
+    local show_chars="\${2:-6}"  # 默认显示前6个字符
+    
+    if [ "\$value" = "null" ] || [ -z "\$value" ]; then
+        echo "未设置"
+    elif [ \${#value} -le \$show_chars ]; then
+        echo "\${value:0:3}***"
+    else
+        echo "\${value:0:\$show_chars}***"
+    fi
+}
+
+# 获取代理信息并进行安全处理
+if [ -f "$CLAUDE_CONFIG_FILE" ] && command -v jq >/dev/null 2>&1; then
+    proxy_data=\$(jq -r ".proxies[\"\$proxy_id\"]" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
+    
+    if [ "\$proxy_data" != "null" ] && [ -n "\$proxy_data" ]; then
+        # 提取各字段
+        name=\$(echo "\$proxy_data" | jq -r '.name // "未命名"')
+        url=\$(echo "\$proxy_data" | jq -r '.url // "未设置"')
+        api_key=\$(echo "\$proxy_data" | jq -r '.api_key // null')
+        auth_token=\$(echo "\$proxy_data" | jq -r '.auth_token // null')
+        
+        # 安全处理敏感信息
+        safe_api_key=\$(safe_mask "\$api_key" 8)
+        safe_auth_token=\$(safe_mask "\$auth_token" 8)
+        
+        # 构建美化的JSON预览
+        echo "📋 代理配置详情"
+        echo "═══════════════════════════════════════"
+        echo ""
+        
+        # 使用jq构建美化的JSON，但替换敏感字段
+        echo "\$proxy_data" | jq --arg safe_key "\$safe_api_key" --arg safe_token "\$safe_auth_token" '{
+            "🆔 代理ID": "'\$proxy_id'",
+            "📝 代理名称": .name,
+            "🔗 代理网址": .url,
+            "🔑 API密钥": (if .api_key and .api_key != "" then \$safe_key else "❌ 未设置" end),
+            "🎫 认证令牌": (if .auth_token and .auth_token != "" then \$safe_token else "❌ 未设置" end)
+        }' 2>/dev/null || {
+            # 如果jq处理失败，使用备用格式
+            echo "{"
+            echo "  \"🆔 代理ID\": \"\$proxy_id\","
+            echo "  \"📝 代理名称\": \"\$name\","
+            echo "  \"🔗 代理网址\": \"\$url\","
+            echo "  \"🔑 API密钥\": \"\$safe_api_key\","
+            echo "  \"🎫 认证令牌\": \"\$safe_auth_token\""
+            echo "}"
+        }
+        
+        echo ""
+        echo "💡 提示: 敏感信息已脱敏处理"
+        
+        # 显示当前使用状态
+        if [ -f "$CLAUDE_CURRENT_FILE" ]; then
+            current_id=\$(cat "$CLAUDE_CURRENT_FILE" 2>/dev/null)
+            if [ "\$current_id" = "\$proxy_id" ]; then
+                echo "✅ 当前正在使用此代理"
+            fi
+        fi
+    else
+        echo "❌ 无法读取代理信息"
+        echo "代理ID: \$proxy_id 不存在或配置文件损坏"
+    fi
+else
+    echo "❌ 配置文件不存在或jq工具未安装"
+    echo "请检查配置文件: $CLAUDE_CONFIG_FILE"
+fi
 EOF
             chmod +x "$preview_script"
             
-            # 使用fzf进行选择
+            # 使用fzf进行选择 - 弹窗模式，优化布局和颜色
              local selected=$(echo "$fzf_options" | fzf \
-                 --height=40% \
-                 --border \
-                 --prompt="选择代理: " \
-                 --header="使用方向键选择，回车确认，ESC取消" \
-                 --preview-window=right:40% \
+                 --height=80% \
+                 --layout=reverse \
+                 --border=rounded \
+                 --border-label=" 🌐 Claude代理站选择器 " \
+                 --border-label-pos=2 \
+                 --prompt="🔍 选择代理 › " \
+                 --header="💡 使用 ↑↓ 选择，Enter 确认，ESC 取消 | 右侧显示详细配置信息" \
+                 --header-lines=0 \
+                 --info=inline \
+                 --preview-window=right:55%:wrap \
                  --preview="'$preview_script' {}" \
-                 --color="fg:#ffffff,bg:#1e1e1e,hl:#00ff00,fg+:#ffffff,bg+:#3a3a3a,hl+:#00ff00,info:#ffff00,prompt:#00ffff,pointer:#ff00ff,marker:#ff0000,spinner:#ffff00,header:#00ffff")
+                 --preview-label=" 📋 配置详情 " \
+                 --preview-label-pos=2 \
+                 --color="fg:#e4e4e7,bg:#18181b,hl:#3b82f6,fg+:#ffffff,bg+:#27272a,hl+:#60a5fa,info:#fbbf24,prompt:#06b6d4,pointer:#f59e0b,marker:#10b981,spinner:#8b5cf6,header:#a855f7,border:#374151,preview-bg:#111827,preview-fg:#f3f4f6,label:#9ca3af" \
+                 --bind="ctrl-u:preview-page-up,ctrl-d:preview-page-down,ctrl-r:reload(echo '$fzf_options')" \
+                 --no-mouse)
             
             # 清理临时文件
             rm -f "$preview_script"
@@ -217,8 +294,12 @@ EOF
                 
                 # 直接切换到选中的代理
                 _claude_set_proxy_env "$selected_id" "true"
+                
+                # 切换成功后直接返回，不显示代理列表
+                return 0
             else
                 print_info "未选择任何代理"
+                return 0
             fi
             
         elif [ "$use_fzf" = "true" ]; then
@@ -248,7 +329,7 @@ EOF
         # 如果是普通模式，提示可以使用fzf
         if [ "$use_fzf" != "true" ] && command -v fzf >/dev/null 2>&1; then
             echo ""
-            print_info "💡 提示: 使用 ${BOLD}claude_proxy select${NC} 启用交互式选择模式"
+            print_info "💡 提示: 使用 ${BOLD}claude_proxy${NC} (无参数) 启用交互式选择模式"
         fi
     }
     
@@ -571,7 +652,7 @@ EOF
             "  ${CYAN}${ICON_PROXY} CLAUDE_PROXY_ID${NC}       -> 当前使用的代理ID" \
             "" \
             "$(print_subheader "${ICON_INFO} 示例:")" \
-            "  ${BOLD}claude_proxy${NC}                         # 交互式选择代理 (默认行为, 需要fzf)" \
+            "  ${BOLD}claude_proxy${NC}                         # 美化的交互式选择代理 (默认行为, 需要fzf)" \
             "  ${BOLD}claude_proxy list${NC}                    # 列出所有代理" \
             "  ${BOLD}claude_proxy switch proxy1${NC}           # 切换到proxy1" \
             "  ${BOLD}claude_proxy add myproxy \"我的代理\" \"https://api.example.com\" \"sk-xxx\"${NC}" \
