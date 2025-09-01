@@ -37,6 +37,7 @@ ICON_LIST='📋'
 ICON_KEY='🔑'
 ICON_TOKEN='🎫'
 ICON_URL='🔗'
+ICON_RELOAD='🔄'
 
 # ==================== 配置文件路径定义 ====================
 CLAUDE_CONFIG_DIR="$HOME/.claude_proxy"          # 配置目录
@@ -410,6 +411,85 @@ EOF
         print_success "代理 '${BOLD}$proxy_id${NC}' 已成功删除"
     }
     
+    # 重新加载配置函数
+    local _claude_reload() {
+        print_header "${ICON_RELOAD} 重新加载Claude代理配置"
+        echo -e "${GRAY}===========================================${NC}"
+        
+        # 检查配置文件是否存在
+        if [ ! -f "$CLAUDE_CONFIG_FILE" ]; then
+            print_error "配置文件不存在: $CLAUDE_CONFIG_FILE"
+            print_info "使用 ${BOLD}claude_proxy init${NC} 初始化配置文件"
+            return 1
+        fi
+        
+        # 检查jq工具
+        if ! command -v jq >/dev/null 2>&1; then
+            print_error "需要安装jq来解析配置文件"
+            print_info "macOS: ${BOLD}brew install jq${NC}"
+            print_info "Ubuntu: ${BOLD}sudo apt-get install jq${NC}"
+            return 1
+        fi
+        
+        # 验证JSON配置文件格式
+        if ! jq empty "$CLAUDE_CONFIG_FILE" >/dev/null 2>&1; then
+            print_error "配置文件格式错误: $CLAUDE_CONFIG_FILE"
+            print_info "请检查JSON格式是否正确"
+            return 1
+        fi
+        
+        print_info "配置文件验证通过"
+        
+        # 重新应用当前代理设置
+        if [ -f "$CLAUDE_CURRENT_FILE" ]; then
+            local current_proxy_id=$(cat "$CLAUDE_CURRENT_FILE")
+            if [ -n "$current_proxy_id" ]; then
+                # 检查当前代理是否仍在配置文件中
+                local proxy_exists=$(jq -r ".proxies | has(\"$current_proxy_id\")" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
+                if [ "$proxy_exists" = "true" ]; then
+                    print_info "重新应用当前代理配置..."
+                    _claude_set_proxy_env "$current_proxy_id" "false"
+                    local proxy_name=$(jq -r ".proxies[\"$current_proxy_id\"].name" "$CLAUDE_CONFIG_FILE" 2>/dev/null)
+                    print_success "已重新加载代理: ${BOLD}$proxy_name${NC} ${GRAY}($current_proxy_id)${NC}"
+                else
+                    print_warning "当前代理 '$current_proxy_id' 在配置文件中不存在"
+                    print_info "清除当前代理设置..."
+                    unset ANTHROPIC_BASE_URL
+                    unset ANTHROPIC_API_KEY
+                    unset ANTHROPIC_AUTH_TOKEN
+                    unset CLAUDE_PROXY_ID
+                    rm -f "$CLAUDE_CURRENT_FILE"
+                    print_success "已清除无效的代理设置"
+                fi
+            else
+                print_info "当前未设置任何代理"
+            fi
+        else
+            print_info "当前未设置任何代理"
+        fi
+        
+        echo ""
+        print_subheader "${ICON_LIST} 可用代理列表:"
+        echo -e "${GRAY}-------------------------------------------${NC}"
+        
+        # 显示所有可用代理
+        local proxy_count=$(jq -r '.proxies | length' "$CLAUDE_CONFIG_FILE" 2>/dev/null)
+        if [ "$proxy_count" -eq 0 ]; then
+            print_warning "配置文件中没有任何代理配置"
+        else
+            jq -r '.proxies | to_entries[] | "\(.key): \(.value.name) (\(.value.url))"' "$CLAUDE_CONFIG_FILE" | while read line; do
+                proxy_id=$(echo "$line" | cut -d':' -f1)
+                proxy_info=$(echo "$line" | cut -d':' -f2-)
+                if [ -n "$CLAUDE_PROXY_ID" ] && [ "$proxy_id" = "$CLAUDE_PROXY_ID" ]; then
+                    echo -e "${GREEN}${ICON_CURRENT} ${BOLD}$proxy_id${NC}${GREEN}:$proxy_info ${YELLOW}[当前使用]${NC}"
+                else
+                    echo -e "${BLUE}${ICON_PROXY} ${BOLD}$proxy_id${NC}${BLUE}:$proxy_info${NC}"
+                fi
+            done
+            print_success "配置重新加载完成 ($proxy_count 个代理)"
+        fi
+    }
+    
     # 状态查看函数
     local _claude_status() {
         print_header "${ICON_STATUS} 当前Claude代理状态"
@@ -479,6 +559,7 @@ EOF
             "  ${GREEN}add${NC} <id> <name> <url> [api_key] [auth_token]" \
             "                        添加新的代理配置" \
             "  ${GREEN}remove, rm${NC} <id>       删除指定的代理配置" \
+            "  ${GREEN}reload${NC}                重新加载配置文件" \
             "  ${GREEN}status${NC}                显示当前代理状态和环境变量" \
             "  ${GREEN}init${NC}                  初始化配置文件" \
             "  ${GREEN}help${NC}                  显示此帮助信息" \
@@ -494,6 +575,7 @@ EOF
             "  ${BOLD}claude_proxy list${NC}                    # 列出所有代理" \
             "  ${BOLD}claude_proxy switch proxy1${NC}           # 切换到proxy1" \
             "  ${BOLD}claude_proxy add myproxy \"我的代理\" \"https://api.example.com\" \"sk-xxx\"${NC}" \
+            "  ${BOLD}claude_proxy reload${NC}                   # 重新加载配置文件" \
             "  ${BOLD}claude_proxy status${NC}                  # 查看当前状态" \
             "" \
             "$(print_subheader "${ICON_WARNING} 注意:")" \
@@ -528,6 +610,9 @@ EOF
             ;;
         "remove"|"rm")
             _claude_remove "$@"
+            ;;
+        "reload")
+            _claude_reload
             ;;
         "status")
             _claude_status
