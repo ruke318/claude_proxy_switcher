@@ -74,10 +74,21 @@ print_highlight() { echo -e "${BOLD}${REVERSE}${PINK} $1 ${NC}"; }
 print_dim() { echo -e "${DIM}${LIGHT_GRAY}$1${NC}"; }
 print_emphasis() { echo -e "${BOLD}${ITALIC}${PURPLE}$1${NC}"; }
 
-# 渐变效果标题（用于重要信息）
+# 现代化标题效果（用于重要信息）
 print_gradient_title() {
     local text="$1"
-    echo -e "${GRADIENT_START}█${GRADIENT_MID}█${GRADIENT_END}█ ${BOLD}${WHITE}$text${NC} ${GRADIENT_END}█${GRADIENT_MID}█${GRADIENT_START}█${NC}"
+    echo -e "${GRADIENT_START}▶${GRADIENT_MID}▶${GRADIENT_END}▶ ${BOLD}${WHITE}$text${NC} ${GRADIENT_END}◀${GRADIENT_MID}◀${GRADIENT_START}◀${NC}"
+}
+
+# 简洁标题效果
+print_modern_title() {
+    local text="$1"
+    echo -e "${BOLD}${CYAN}✨ $text ${ICON_SUCCESS}${NC}"
+}
+
+# 优雅分隔线
+print_elegant_separator() {
+    echo -e "${DIM}${LIGHT_GRAY}╭─────────────────────────────────────────────────────────────────────────────╮${NC}"
 }
 
 # ==================== 核心函数 ====================
@@ -115,7 +126,7 @@ _claude_set_proxy_env() {
     # 只在非静默模式下显示详细信息
     if [ "$silent" != "true" ]; then
         # 显示切换结果
-        print_gradient_title "代理切换成功"
+        print_modern_title "代理切换成功"
         print_success "已切换到代理: ${BOLD}${PURPLE}$proxy_name${NC} ${DIM}${LIGHT_GRAY}($proxy_url)${NC}"
         print_config "环境变量配置:"
         echo -e "  ${BOLD}${BLUE}${ICON_URL} ANTHROPIC_BASE_URL${NC} ${DIM}→${NC} ${UNDERLINE}${CYAN}$proxy_url${NC}"
@@ -163,8 +174,8 @@ _claude_interactive_select() {
         current=$(cat "$CLAUDE_CURRENT_FILE")
     fi
     
-    print_gradient_title "Claude 代理选择器"
-    print_dim "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    print_modern_title "Claude 代理选择器"
+    print_elegant_separator
     
     # 生成fzf选项列表
     local fzf_options=$(jq -r '.proxies | to_entries[] | "\(.key): \(.value.name) (\(.value.url))"' "$CLAUDE_CONFIG_FILE" | while read line; do
@@ -301,6 +312,6 @@ if [ -f "$CLAUDE_CURRENT_FILE" ] && [ -f "$CLAUDE_CONFIG_FILE" ] && command -v j
 fi
 
 # 显示使用说明
-print_gradient_title "Claude 代理切换工具已加载"
-print_dim "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+print_modern_title "Claude 代理切换工具已加载"
+print_elegant_separator
 print_emphasis "输入 ${BOLD}${CYAN}claude_proxy${NC} 开始使用"
