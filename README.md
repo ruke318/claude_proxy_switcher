@@ -1,48 +1,41 @@
-# Claude代理切换工具 (Rust版本)
+# Claude代理切换工具
 
-🚀 **claude_px** - 一个用Rust重写的Claude代理站切换工具，提供更快的性能和更好的用户体验。
-
-## ✨ 特性
-
-- 🦀 **Rust编写** - 更快的启动速度和更低的资源占用
-- 🎯 **交互式选择** - 使用skim提供流畅的交互体验
-- 🌈 **彩色输出** - 美观的命令行界面
-- 📦 **简单配置** - JSON格式的配置文件
-- 🔄 **自动恢复** - 启动时自动恢复上次使用的代理
-- 🛡️ **安全管理** - 敏感信息部分隐藏显示
+🚀 **Claude Proxy Switcher** - 一个现代化的Claude代理站切换工具，提供优雅的交互式界面和流畅的用户体验。
 
 ## ✨ 特性
 
-- 🎯 **多代理管理**: 支持添加、删除、列表显示多个代理配置
-- 🔄 **快速切换**: 一键切换不同的 Claude 代理站
-- 🎨 **美观界面**: 彩色输出和图标，提升用户体验
-- ⚙️ **环境变量**: 自动设置 Anthropic 相关环境变量
-- 🔒 **安全显示**: 认证信息部分隐藏，保护隐私
-- 📝 **JSON配置**: 使用 JSON 格式存储配置，易于管理
-- 🚀 **即插即用**: 无需安装，source 即可使用
+- 🎯 **交互式选择** - 使用 fzf 提供现代化的交互体验，支持模糊搜索和实时预览
+- 🌈 **现代化界面** - 优雅的配色方案和图标设计，告别传统的"大白块"显示
+- 🔄 **智能恢复** - 启动时自动恢复上次使用的代理配置
+- 📊 **详细预览** - 交互界面中实时显示代理详细信息，包括URL、ID和认证状态
+- ⚙️ **环境变量管理** - 自动设置和清理 Anthropic 相关环境变量
+- 🔒 **安全显示** - 认证信息智能脱敏，保护隐私安全
+- 📝 **JSON配置** - 使用 JSON 格式存储配置，易于管理和备份
+- 🚀 **即插即用** - 无需安装，source 即可使用，支持所有主流 Shell
 
 ## 🛠️ 安装
 
 ### 前置要求
 
 - **jq**: JSON 处理工具
+- **fzf**: 模糊搜索工具（用于交互式选择）
   ```bash
   # macOS
-  brew install jq
+  brew install jq fzf
   
   # Ubuntu/Debian
-  sudo apt-get install jq
+  sudo apt-get install jq fzf
   
   # CentOS/RHEL
-  sudo yum install jq
+  sudo yum install jq fzf
   ```
 
 ### 快速安装
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-username/claude-proxy-switcher.git
-cd claude-proxy-switcher
+git clone https://github.com/ruke318/claude_proxy_switcher.git
+cd claude_proxy_switcher
 
 # 加载脚本
 source claude_proxy_switcher.sh
@@ -59,52 +52,35 @@ source /path/to/claude_proxy_switcher.sh
 
 ## 🚀 使用方法
 
-### 基本命令
-
 ```bash
-# 查看帮助
-claude_proxy help
-
-# 列出所有代理
-claude_proxy list
-
-# 切换代理
-claude_proxy switch <proxy_id>
-
-# 查看当前状态
-claude_proxy status
-
-# 初始化配置
-claude_proxy init
+# 启动交互式代理选择器
+claude_proxy
 ```
+
+这将打开一个现代化的交互界面，支持：
+- 🔍 **模糊搜索**: 输入关键词快速筛选代理
+- 👁️ **实时预览**: 右侧面板显示代理详细信息
+- ⌨️ **键盘导航**: 使用方向键或 Ctrl+J/K 导航
+- ✨ **优雅界面**: 现代化配色和图标设计
 
 ### 管理代理配置
 
+代理配置通过直接编辑配置文件进行管理：
+
 ```bash
-# 添加新代理
-claude_proxy add <id> <name> <url> [api_key] [auth_token]
-
-# 示例：添加一个使用 API Key 的代理
-claude_proxy add myproxy "我的代理" "https://api.example.com" "sk-xxx"
-
-# 示例：添加一个使用 Auth Token 的代理
-claude_proxy add proxy2 "代理站2" "https://api.proxy2.com" "" "auth-token-xxx"
-
-# 删除代理
-claude_proxy remove <proxy_id>
+# 编辑配置文件
+vim ~/.claude_proxy/config.json
 ```
 
-## 📋 命令详解
+## 🎯 核心功能
 
-| 命令 | 别名 | 描述 | 示例 |
-|------|------|------|------|
-| `list` | `ls` | 列出所有可用的代理配置 | `claude_proxy list` |
-| `switch` | `use` | 切换到指定的代理 | `claude_proxy switch wenwen` |
-| `add` | - | 添加新的代理配置 | `claude_proxy add id "名称" "URL" "key"` |
-| `remove` | `rm` | 删除指定的代理配置 | `claude_proxy remove proxy1` |
-| `status` | - | 显示当前代理状态和环境变量 | `claude_proxy status` |
-| `init` | - | 初始化配置文件 | `claude_proxy init` |
-| `help` | - | 显示帮助信息 | `claude_proxy help` |
+工具专注于提供最佳的交互式代理选择体验：
+
+- **🚀 一键启动**: 只需运行 `claude_proxy` 即可打开交互界面
+- **🔍 智能搜索**: 支持模糊搜索，快速定位目标代理
+- **👁️ 实时预览**: 选择代理时实时显示详细信息
+- **⚡ 快速切换**: Enter 键确认切换，Esc 键退出
+- **🔄 自动恢复**: 启动时自动恢复上次使用的代理
 
 ## ⚙️ 配置文件
 
@@ -149,54 +125,41 @@ claude_proxy remove <proxy_id>
 
 ## 📸 界面预览
 
-### 帮助信息
+### 🎯 交互式选择界面
+
+现代化的交互界面提供了优雅的用户体验：
+
+![Claude代理选择器界面](https://github.com/ruke318/claude_proxy_switcher/raw/main/screenshots/interactive-ui.png)
+
+**界面特点：**
+- 🎨 **现代配色**: 深色主题配合青色高亮，视觉舒适
+- 📋 **代理列表**: 左侧显示所有可用代理，支持模糊搜索
+- 👁️ **详细预览**: 右侧实时显示选中代理的详细信息
+- 🔍 **智能搜索**: 支持按代理名称、URL等关键词快速筛选
+- ⌨️ **快捷操作**: 方向键导航，Enter确认，Esc退出
+
+### 🚀 工具加载效果
+
 ```
-❓ Claude代理切换工具 v2.4
-===========================================
-
-ℹ️ 功能: 管理多个Claude代理站配置，支持快速切换不同的API端点和认证信息
-
-⚙️ 用法: claude_proxy <命令> [参数...]
-
-📋 可用命令:
-  list, ls              列出所有可用的代理配置
-  switch, use <id>      切换到指定的代理
-  add <id> <name> <url> [api_key] [auth_token]
-                        添加新的代理配置
-  ...
-```
-
-### 代理列表
-```
-📋 可用的Claude代理站
-===========================================
-👉 wenwen: 文文AI (https://api.wenwenai.com) [当前使用]
-🌐 anyrouter: AnyRouter (https://api.anyrouter.ai)
+🚀 已自动恢复上次使用的代理: yinhe (yinhe)
+✨ Claude 代理切换工具已加载 🚀
+╭─────────────────────────────────────────────────────────────────────────────╮
+输入 claude_proxy 开始使用
 ```
 
-### 状态信息
-```
-📊 当前Claude代理状态
-===========================================
-👉 当前代理: wenwen
-🌐 代理名称: 文文AI
+### 📊 代理切换成功
 
-⚙️ 环境变量
--------------------------------------------
-🔗 ANTHROPIC_BASE_URL: https://api.wenwenai.com
-🌐 CLAUDE_PROXY_ID: wenwen
-🎫 ANTHROPIC_AUTH_TOKEN: auth-token...
+```
+✨ 代理切换成功 🚀
+╭─────────────────────────────────────────────────────────────────────────────╮
+👉 当前代理: yinhe
+🌐 代理名称: 银河AI
+🔗 代理URL: https://api.yinhe.com
+🆔 代理ID: yinhe
+🎫 认证令牌: sk-AkFB3***
 ```
 
-## 🔧 高级功能
-
-### 批量操作
-
-```bash
-# 快速切换到不同代理进行测试
-claude_proxy switch wenwen && echo "Testing wenwen..."
-claude_proxy switch anyrouter && echo "Testing anyrouter..."
-```
+## 🔧 高级使用
 
 ### 脚本集成
 
@@ -204,8 +167,17 @@ claude_proxy switch anyrouter && echo "Testing anyrouter..."
 #!/bin/bash
 # 在脚本中使用
 source claude_proxy_switcher.sh
-claude_proxy switch wenwen
-# 你的 Claude API 调用代码
+# 环境变量会自动设置，可直接使用 Claude API
+```
+
+### 配置备份
+
+```bash
+# 备份配置文件
+cp ~/.claude_proxy/config.json ~/.claude_proxy/config.json.backup
+
+# 恢复配置文件
+cp ~/.claude_proxy/config.json.backup ~/.claude_proxy/config.json
 ```
 
 ## 🛡️ 安全特性
@@ -227,7 +199,15 @@ claude_proxy switch wenwen
 
 ## 📝 更新日志
 
-### v2.4 (当前版本)
+### v2.5 (当前版本)
+- ✨ **界面革新**: 全新现代化交互界面设计
+- 🎨 **视觉优化**: 移除"大白块"，采用优雅的图标和配色方案
+- 🔍 **交互增强**: 集成 fzf 提供模糊搜索和实时预览功能
+- 📊 **信息展示**: 右侧面板实时显示代理详细信息
+- 🎯 **用户体验**: 支持键盘导航和快捷操作
+- 🌈 **配色升级**: 深色主题配合青色高亮，视觉更舒适
+
+### v2.4
 - ✨ 添加彩色输出和图标支持
 - 🎨 优化用户界面体验
 - 🔧 使用 printf 优化多行输出
